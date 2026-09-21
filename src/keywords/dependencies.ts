@@ -37,7 +37,8 @@ export function parseDependencies(node: SchemaNode) {
     for (const property of Object.keys(dependencies)) {
         const schema = dependencies[property] as string[];
         if (isJsonSchema(schema) || isBooleanSchema(schema)) {
-            node.dependentSchemas = node.dependentSchemas ?? {};
+            node.dependentSchemas =
+                node.dependentSchemas ?? (Object.create(null) as Record<string, SchemaNode | boolean>);
             node.dependentSchemas[property] = node.compileSchema(
                 schema,
                 `${node.evaluationPath}/${KEYWORD}/${property}`,
@@ -45,7 +46,7 @@ export function parseDependencies(node: SchemaNode) {
             );
             collectValidationErrors(errors, node.dependentSchemas[property]);
         } else if (isListOfStrings(schema)) {
-            node.dependentRequired = node.dependentRequired ?? {};
+            node.dependentRequired = node.dependentRequired ?? (Object.create(null) as Record<string, string[]>);
             node.dependentRequired[property] = schema;
         } else {
             errors.push(

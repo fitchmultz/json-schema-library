@@ -28,7 +28,7 @@ export function parseDependentRequired(node: SchemaNode) {
     }
 
     const errors: ValidationAnnotation[] = [];
-    node.dependentRequired = {};
+    node.dependentRequired = Object.create(null) as Record<string, string[]>;
     for (const propertyName of Object.keys(schema[KEYWORD])) {
         const list = schema[KEYWORD][propertyName];
         if (isListOfStrings(list)) {
