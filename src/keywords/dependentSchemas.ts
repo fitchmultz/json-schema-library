@@ -38,7 +38,7 @@ export function parseDependentSchemas(node: SchemaNode) {
     }
 
     const errors: ValidationAnnotation[] = [];
-    const parsedSchemas: Record<string, boolean | SchemaNode> = {};
+    const parsedSchemas: Record<string, boolean | SchemaNode> = Object.create(null);
     for (const property of Object.keys(dependentSchemas)) {
         const schema = dependentSchemas[property];
         if (isObject(schema)) {
@@ -79,7 +79,7 @@ export function reduceDependentSchemas({ node, data }: JsonSchemaReducerParams) 
         if (dependentSchemas[propertyName] == null) {
             return;
         }
-        mergedSchema = mergedSchema ?? { properties: {} };
+        mergedSchema = mergedSchema ?? { properties: Object.create(null) };
         if (isSchemaNode(dependentSchemas[propertyName])) {
             mergedSchema = mergeSchema(mergedSchema, dependentSchemas[propertyName].schema);
         } else {

@@ -24,7 +24,7 @@ function mergeObjects(a?: Record<string, SchemaNode>, b?: Record<string, SchemaN
     if (a == null || b == null) {
         return b || a;
     }
-    const object: Record<string, SchemaNode> = {};
+    const object: Record<string, SchemaNode> = Object.create(null);
     [...Object.keys(a), ...Object.keys(b)]
         .filter((p, i, l) => l.indexOf(p) === i)
         .forEach((key) => {

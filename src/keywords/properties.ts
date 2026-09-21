@@ -41,7 +41,7 @@ export function parseProperties(node: SchemaNode) {
     }
 
     const errors: ValidationAnnotation[] = [];
-    const parsedProperties: Record<string, SchemaNode> = {};
+    const parsedProperties: Record<string, SchemaNode> = Object.create(null);
     Object.keys(schema.properties).forEach((propertyName) => {
         const propertyNode = node.compileSchema(
             schema.properties[propertyName],
