@@ -56,8 +56,12 @@ describe("keyword : enum : validate", () => {
     for (const json of ['{"toString":"label"}', '{"valueOf":1}', '{"constructor":{"a":1}}']) {
         it(`should accept equal JSON objects with literal member names: ${json}`, () => {
             const node = compileSchema({ enum: [JSON.parse(json)] });
+            const parsed = JSON.parse(json);
+            const blank = Object.assign(Object.create(null), parsed);
 
-            assert.equal(node.validate(JSON.parse(json)).valid, true);
+            assert.equal(node.validate(parsed).valid, true);
+            assert.equal(node.validate(blank).valid, true);
+            assert.equal(node.validate({ ...parsed, extra: true }).valid, false);
         });
     }
 

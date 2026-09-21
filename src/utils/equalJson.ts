@@ -12,8 +12,9 @@ export function equalJson(a: unknown, b: unknown): boolean {
         return true;
     }
     if (isObject(a) && isObject(b)) {
-        // Keep custom host-object semantics in the existing comparator.
-        if (Object.getPrototypeOf(a) !== Object.prototype || Object.getPrototypeOf(b) !== Object.prototype) {
+        // Null-prototype maps are plain data. Keep other host objects on the existing comparator.
+        const prototypes = [Object.getPrototypeOf(a), Object.getPrototypeOf(b)];
+        if (prototypes.some((prototype) => prototype !== Object.prototype && prototype !== null)) {
             return equal(a, b);
         }
         const keys = Object.keys(a);
