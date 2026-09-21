@@ -1,5 +1,5 @@
 import { ValidationPath } from "./Keyword";
-import { SchemaNode } from "./types";
+import { isJsonError, SchemaNode } from "./types";
 import { hasProperty } from "./utils/hasProperty";
 // import { getValue } from "./utils/getValue";
 import { validateNode } from "./validateNode";
@@ -51,7 +51,11 @@ export function isPropertyEvaluated({ node, data, key, pointer, path }: Options)
 
     if (node.anyOf) {
         for (const anyOf of node.anyOf) {
-            if (isPropertyEvaluated({ node: anyOf, data, key, pointer, path })) {
+            // only a branch that validates the data contributes evaluated-property state
+            if (
+                !validateNode(anyOf, data, pointer, path).some(isJsonError) &&
+                isPropertyEvaluated({ node: anyOf, data, key, pointer, path })
+            ) {
                 return true;
             }
         }
@@ -59,18 +63,22 @@ export function isPropertyEvaluated({ node, data, key, pointer, path }: Options)
 
     if (node.oneOf) {
         for (const oneOf of node.oneOf) {
-            if (isPropertyEvaluated({ node: oneOf, data, key, pointer, path })) {
+            // only a branch that validates the data contributes evaluated-property state
+            if (
+                !validateNode(oneOf, data, pointer, path).some(isJsonError) &&
+                isPropertyEvaluated({ node: oneOf, data, key, pointer, path })
+            ) {
                 return true;
             }
         }
     }
 
     if (node.if) {
-        if (isPropertyEvaluated({ node: node.if, data, key, pointer, path })) {
+        const validIf = !validateNode(node.if, data, pointer, path).some(isJsonError);
+        if (validIf && isPropertyEvaluated({ node: node.if, data, key, pointer, path })) {
             return true;
         }
 
-        const validIf = validateNode(node.if, data, pointer, path).length === 0;
         if (validIf && node.then) {
             if (isPropertyEvaluated({ node: node.then, data, key, pointer, path })) {
                 return true;

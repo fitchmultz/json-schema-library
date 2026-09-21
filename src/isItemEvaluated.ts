@@ -1,5 +1,5 @@
 import { ValidationPath } from "./Keyword";
-import { SchemaNode } from "./types";
+import { isJsonError, SchemaNode } from "./types";
 import { getValue } from "./utils/getValue";
 import { validateNode } from "./validateNode";
 
@@ -30,7 +30,7 @@ export function isItemEvaluated({ node, data, key, pointer, path }: Options) {
         return true;
     }
 
-    if (node.contains && validateNode(node.contains, value, `${pointer}/${key}`, path).length === 0) {
+    if (node.contains && !validateNode(node.contains, value, `${pointer}/${key}`, path).some(isJsonError)) {
         return true;
     }
 
@@ -43,7 +43,11 @@ export function isItemEvaluated({ node, data, key, pointer, path }: Options) {
     }
     if (node.anyOf) {
         for (const anyOf of node.anyOf) {
-            if (isItemEvaluated({ node: anyOf, data, key, pointer, path })) {
+            // only a branch that validates the data contributes evaluated-item state
+            if (
+                !validateNode(anyOf, data, pointer, path).some(isJsonError) &&
+                isItemEvaluated({ node: anyOf, data, key, pointer, path })
+            ) {
                 return true;
             }
         }
@@ -51,17 +55,21 @@ export function isItemEvaluated({ node, data, key, pointer, path }: Options) {
 
     if (node.oneOf) {
         for (const oneOf of node.oneOf) {
-            if (isItemEvaluated({ node: oneOf, data, key, pointer, path })) {
+            // only a branch that validates the data contributes evaluated-item state
+            if (
+                !validateNode(oneOf, data, pointer, path).some(isJsonError) &&
+                isItemEvaluated({ node: oneOf, data, key, pointer, path })
+            ) {
                 return true;
             }
         }
     }
 
     if (node.if) {
-        if (isItemEvaluated({ node: node.if, data, key, pointer, path })) {
+        const validIf = !validateNode(node.if, data, pointer, path).some(isJsonError);
+        if (validIf && isItemEvaluated({ node: node.if, data, key, pointer, path })) {
             return true;
         }
-        const validIf = validateNode(node.if, data, pointer, path).length === 0;
 
         if (validIf && node.if.prefixItems && node.if.prefixItems.length > key) {
             // evaluated by if
