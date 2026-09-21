@@ -1,5 +1,5 @@
 import { appendDataPointer } from "../utils/appendDataPointer";
-import { isBooleanSchema, isJsonSchema, JsonError } from "../types";
+import { isBooleanSchema, isJsonError, isJsonSchema, JsonError } from "../types";
 import { isObject } from "../utils/isObject";
 import { SchemaNode } from "../types";
 import { Keyword, JsonSchemaValidatorParams } from "../Keyword";
@@ -73,12 +73,13 @@ function validatePropertyNames({ node, data, pointer, path }: JsonSchemaValidato
     const properties = Object.keys(data);
     properties.forEach((prop) => {
         const validationResult = validateNode(propertyNames, prop, appendDataPointer(pointer, prop), path);
-        if (validationResult.length > 0) {
+        const validationError = validationResult.find(isJsonError);
+        if (validationError) {
             errors.push(
                 node.createError("invalid-property-name-error", {
                     property: prop,
                     pointer,
-                    validationError: validationResult[0],
+                    validationError,
                     value: data[prop],
                     schema
                 })

@@ -1,6 +1,6 @@
 import { strict as assert } from "assert";
 import { compileSchema } from "../../compileSchema";
-import { JsonSchema } from "../../types";
+import { isJsonError, JsonSchema } from "../../types";
 
 const $schema = "https://json-schema.org/draft/2020-12/schema";
 
@@ -208,6 +208,69 @@ describe("branch validity and annotations", () => {
             }
         });
     }
+
+    it("propertyNames accepts names with successful annotations", () => {
+        const node = compileSchema({ propertyNames: { type: "string", minLength: 2, deprecated: true } });
+        const result = node.validate({ valid: 1 });
+        assert.equal(result.valid, true);
+        assert.deepEqual(result.errors, []);
+    });
+
+    it("propertyNames reports the actual error after an annotation", () => {
+        const node = compileSchema({ propertyNames: { type: "string", minLength: 2, deprecated: true } });
+        for (const name of ["x", "/"]) {
+            const result = node.validate({ [name]: 1 }, "#/a~1b");
+            assert.equal(result.valid, false);
+            assert.equal(result.errors.length, 1);
+            const error = result.errors[0];
+            assert.equal(error.code, "invalid-property-name-error");
+            assert.equal(error.data.pointer, "#/a~1b");
+            assert.equal(error.data.property, name);
+            const validationError = error.data.validationError;
+            assert(isJsonError(validationError));
+            assert.equal(validationError.code, "min-length-error");
+            assert.equal(validationError.data.pointer, name === "/" ? "#/a~1b/~1" : "#/a~1b/x");
+        }
+    });
+
+    it("draft2019 unevaluatedItems accepts annotated tuple items and rejects invalid or extra items", () => {
+        const node = compileSchema({
+            $schema: "https://json-schema.org/draft/2019-09/schema",
+            items: [{ type: "number", deprecated: true }],
+            unevaluatedItems: false
+        });
+        const result = node.validate([1], "#/a~1b");
+        assert.equal(result.valid, true);
+        assert.deepEqual(result.errors, []);
+        assert.equal(result.annotations[0]?.data.pointer, "#/a~1b/0");
+        const invalid = node.validate(["wrong"]);
+        assert.equal(invalid.valid, false);
+        assert.equal(invalid.errors[0].code, "type-error");
+        const extra = node.validate([1, 2]);
+        assert.equal(extra.valid, false);
+        assert.equal(extra.errors[0].code, "unevaluated-items-error");
+        assert.equal(extra.errors[0].data.pointer, "#/1");
+    });
+
+    it("draft2019 unevaluatedItems uses successful annotated if evaluations only", () => {
+        const node = compileSchema({
+            $schema: "https://json-schema.org/draft/2019-09/schema",
+            if: { items: [{ type: "number" }], deprecated: true },
+            unevaluatedItems: false
+        });
+        const result = node.validate([1]);
+        assert.equal(result.valid, true);
+        assert.deepEqual(result.errors, []);
+        assert.equal(result.annotations[0]?.code, "deprecated-warning");
+        const invalid = node.validate(["wrong"]);
+        assert.equal(invalid.valid, false);
+        assert.equal(invalid.errors[0].code, "unevaluated-items-error");
+        assert.equal(invalid.errors[0].data.pointer, "#/0");
+        const extra = node.validate([1, 2]);
+        assert.equal(extra.valid, false);
+        assert.equal(extra.errors[0].code, "unevaluated-items-error");
+        assert.equal(extra.errors[0].data.pointer, "#/1");
+    });
 
     it("keeps invalid annotation schemas as schema errors", () => {
         assert.throws(() => compileSchema({ oneOf: [{ deprecated: "yes" }] }, { throwOnInvalidSchema: true }));
