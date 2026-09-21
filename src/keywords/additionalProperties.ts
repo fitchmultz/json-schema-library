@@ -1,3 +1,4 @@
+import { appendDataPointer } from "../utils/appendDataPointer";
 import settings from "../settings";
 import { isObject } from "../utils/isObject";
 import { Keyword, JsonSchemaResolverParams, JsonSchemaValidatorParams, ValidationReturnType } from "../Keyword";
@@ -106,7 +107,7 @@ function validateAdditionalProperty({ node, data, pointer = "#", path }: JsonSch
                 const validationErrors = validateNode(
                     node.additionalProperties,
                     propertyValue,
-                    `${pointer}/${property}`,
+                    appendDataPointer(pointer, property),
                     path
                 );
                 if (validationErrors) {
@@ -116,7 +117,7 @@ function validateAdditionalProperty({ node, data, pointer = "#", path }: JsonSch
             } else {
                 errors.push(
                     node.createError("no-additional-properties-error", {
-                        pointer: `${pointer}/${property}`,
+                        pointer: appendDataPointer(pointer, property),
                         schema,
                         value: data,
                         property,

@@ -1,3 +1,4 @@
+import { appendDataPointer } from "../utils/appendDataPointer";
 import {
     Keyword,
     JsonSchemaReducerParams,
@@ -161,7 +162,7 @@ export function reduceOneOfDeclarator({ node, data, pointer, path }: Omit<JsonSc
 
         // collect errors in case we fail finding a matching schema
         const result = sanitizeErrors(
-            validateNode(resultNode, oneOfPropertyValue, `${pointer}/${oneOfProperty}`, path)
+            validateNode(resultNode, oneOfPropertyValue, appendDataPointer(pointer, oneOfProperty), path)
         );
 
         if (result.length > 0) {
@@ -317,7 +318,12 @@ function validateFromDeclarator({ node, data, pointer = "#", path }: JsonSchemaV
     for (const oneOfNode of oneOf) {
         const { node: oneOfPropertyNode, error } = oneOfNode.getNodeChild(oneOfProperty, oneOfValue);
         if (oneOfPropertyNode) {
-            const validationResult = validateNode(oneOfPropertyNode, oneOfValue, `${pointer}/${oneOfProperty}`, path);
+            const validationResult = validateNode(
+                oneOfPropertyNode,
+                oneOfValue,
+                appendDataPointer(pointer, oneOfProperty),
+                path
+            );
             if (validationResult.length > 0) {
                 errors.push(...validationResult);
             } else {

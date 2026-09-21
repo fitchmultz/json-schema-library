@@ -1,3 +1,4 @@
+import { appendDataPointer } from "../utils/appendDataPointer";
 import { mergeSchema } from "../utils/mergeSchema";
 import { JsonSchema, SchemaNode } from "../types";
 import { isObject } from "../utils/isObject";
@@ -107,7 +108,9 @@ function validatePatternProperties({ node, data, pointer, path }: JsonSchemaVali
         const value = getValue(data, key);
         // patternProperties was tested in addValidate
         const matchingPatterns = patternProperties!.filter((property) => property.pattern.test(key));
-        matchingPatterns.forEach(({ node }) => errors.push(...validateNode(node, value, `${pointer}/${key}`, path)));
+        matchingPatterns.forEach(({ node }) =>
+            errors.push(...validateNode(node, value, appendDataPointer(pointer, key), path))
+        );
 
         if (properties[key]) {
             return;
@@ -118,7 +121,7 @@ function validatePatternProperties({ node, data, pointer, path }: JsonSchemaVali
             errors.push(
                 node.createError("no-additional-properties-error", {
                     key,
-                    pointer: `${pointer}/${key}`,
+                    pointer: appendDataPointer(pointer, key),
                     schema,
                     value,
                     patterns
