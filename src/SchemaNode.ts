@@ -124,7 +124,7 @@ export interface SchemaNode extends SchemaNodeMethodsType {
      * - may not have any association to the principal schema
      */
     schemaLocation: string;
-    /** id created when combining subschemas */
+    /** id created when combining or deriving subschemas */
     dynamicId: string;
     /** reference to parent node (node used to compile this node) */
     parent?: SchemaNode | undefined;
@@ -460,7 +460,12 @@ export const SchemaNodeMethods = {
             return { node, error: undefined };
             // @ts-expect-error bool schema
         } else if (node.schema === true) {
-            const nextNode = node.compileSchema(createSchema(data), node.evaluationPath, node.schemaLocation);
+            const nextNode = node.compileSchema(
+                createSchema(data),
+                node.evaluationPath,
+                node.schemaLocation,
+                `${node.schemaLocation}(createSchema)`
+            );
             path?.push({ pointer, node });
             return { node: nextNode, error: undefined };
         }

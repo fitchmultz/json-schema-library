@@ -22,7 +22,8 @@ export const $refKeyword: Keyword = {
 };
 
 function register(node: SchemaNode, path: string) {
-    if (node.context.refs[path] == null) {
+    // Data-dependent reductions share the context, but are not authored reference targets.
+    if (!node.dynamicId && node.context.refs[path] == null) {
         node.context.refs[path] = node;
     }
 }
@@ -49,7 +50,7 @@ export function parseRef(node: SchemaNode) {
 
     // @draft-2020:  A $dynamicRef to a $dynamicAnchor in the same schema resource behaves like a normal $ref to an $anchor
     const anchor = node.schema.$anchor;
-    if (anchor) {
+    if (anchor && !node.dynamicId) {
         // store this node for retrieval by $id + anchor
         const anchorUrl = `${currentId.replace(/#$/, "")}#${anchor}`;
         if (node.context.anchors[anchorUrl] == null) {
@@ -58,7 +59,7 @@ export function parseRef(node: SchemaNode) {
     }
 
     const dynamicAnchor = node.schema.$dynamicAnchor;
-    if (dynamicAnchor) {
+    if (dynamicAnchor && !node.dynamicId) {
         // store this node for retrieval by $id + anchor
         const dynamicAnchorUrl = `${currentId.replace(/#$/, "")}#${dynamicAnchor}`;
         if (node.context.dynamicAnchors[dynamicAnchorUrl] == null) {
@@ -189,7 +190,8 @@ export function compileNext(referencedNode: SchemaNode, sourceNode: SchemaNode) 
     return referencedNode.compileSchema(
         referencedSchema,
         `${sourceNode.evaluationPath}/$ref`,
-        referencedNode.schemaLocation
+        referencedNode.schemaLocation,
+        sourceNode.dynamicId
     );
 }
 

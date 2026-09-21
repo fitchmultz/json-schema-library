@@ -25,7 +25,7 @@ function parseRef(node: SchemaNode) {
     node.resolveRef = resolveRef;
 
     // store this node for retrieval by $id
-    if (node.context.refs[currentId as string] == null) {
+    if (!node.dynamicId && node.context.refs[currentId as string] == null) {
         node.context.refs[currentId as string] = node;
     }
 
@@ -34,14 +34,17 @@ function parseRef(node: SchemaNode) {
         node.lastIdPointer = node.evaluationPath;
     }
 
-    // store this node for retrieval by $id + json-pointer from $id
-    if (node.lastIdPointer !== "#" && node.evaluationPath.startsWith(node.lastIdPointer)) {
-        const localPointer = `#${node.evaluationPath.replace(node.lastIdPointer, "")}`;
-        node.context.refs[resolveUri(currentId, localPointer)] = node;
-    } else {
-        node.context.refs[resolveUri(currentId, node.evaluationPath)] = node;
+    // Data-dependent reductions must not replace authored reference targets.
+    if (!node.dynamicId) {
+        // store this node for retrieval by $id + json-pointer from $id
+        if (node.lastIdPointer !== "#" && node.evaluationPath.startsWith(node.lastIdPointer)) {
+            const localPointer = `#${node.evaluationPath.replace(node.lastIdPointer, "")}`;
+            node.context.refs[resolveUri(currentId, localPointer)] = node;
+        } else {
+            node.context.refs[resolveUri(currentId, node.evaluationPath)] = node;
+        }
+        node.context.refs[resolveUri(node.context.rootNode.$id, node.evaluationPath)] = node;
     }
-    node.context.refs[resolveUri(node.context.rootNode.$id, node.evaluationPath)] = node;
 
     // precompile reference
     if (node.schema.$ref) {

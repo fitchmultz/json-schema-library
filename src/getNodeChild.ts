@@ -55,7 +55,8 @@ export function getNodeChild(
         const newNode = parentNode.compileSchema(
             parentNode.createSchema(getValue(data, key)),
             `${parentNode.evaluationPath}/additional`,
-            `${parentNode.schemaLocation}/additional`
+            `${parentNode.schemaLocation}/additional`,
+            `${parentNode.schemaLocation}(createSchema)`
         );
         return { node: newNode, error: undefined };
     }

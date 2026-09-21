@@ -17,7 +17,7 @@ export const $refKeyword: Keyword = {
 };
 
 function register(node: SchemaNode, path: string) {
-    if (node.context.refs[path] == null) {
+    if (!node.dynamicId && node.context.refs[path] == null) {
         node.context.refs[path] = node;
     }
 }
@@ -43,7 +43,7 @@ export function parseRef(node: SchemaNode) {
     register(node, resolveUri(node.context.rootNode.$id, node.evaluationPath));
 
     // store this node for retrieval by $id + anchor
-    if (node.schema.$anchor) {
+    if (node.schema.$anchor && !node.dynamicId) {
         node.context.anchors[`${currentId.replace(/#$/, "")}#${node.schema.$anchor}`] = node;
     }
 
