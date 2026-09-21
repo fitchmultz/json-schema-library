@@ -1,3 +1,4 @@
+import { join } from "@sagold/json-pointer";
 import { mergeSchema } from "../utils/mergeSchema";
 import { isObject } from "../utils/isObject";
 import { isSchemaNode, SchemaNode, JsonSchema, isBooleanSchema } from "../types";
@@ -40,12 +41,13 @@ export function parseDependentSchemas(node: SchemaNode) {
     const errors: ValidationAnnotation[] = [];
     const parsedSchemas: Record<string, boolean | SchemaNode> = Object.create(null);
     for (const property of Object.keys(dependentSchemas)) {
+        const propertyPointer = join([property], true).slice(1);
         const schema = dependentSchemas[property];
         if (isObject(schema)) {
             parsedSchemas[property] = node.compileSchema(
                 schema,
-                `${node.evaluationPath}/${KEYWORD}/${property}`,
-                `${node.schemaLocation}/${KEYWORD}/${property}`
+                `${node.evaluationPath}/${KEYWORD}${propertyPointer}`,
+                `${node.schemaLocation}/${KEYWORD}${propertyPointer}`
             );
             collectValidationErrors(errors, parsedSchemas[property]);
         } else if (isBooleanSchema(schema)) {
@@ -53,7 +55,7 @@ export function parseDependentSchemas(node: SchemaNode) {
         } else {
             errors.push(
                 node.createError("schema-error", {
-                    pointer: `${node.schemaLocation}/${KEYWORD}/${property}`,
+                    pointer: `${node.schemaLocation}/${KEYWORD}${propertyPointer}`,
                     schema: node.schema,
                     value: schema,
                     message: `Keyword '${KEYWORD}[string]' must be a valid JSON Schema'`

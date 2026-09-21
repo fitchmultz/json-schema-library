@@ -77,6 +77,13 @@ export function mergeNode(a?: SchemaNode, b?: SchemaNode, ...omit: string[]): Sc
         arraySelection.items = mergeNode(a.items, b.items)!;
     }
 
+    const definitions = mergeObjects(a.definitions, b.definitions);
+    const $defs =
+        mergeObjects(
+            a.$defs === a.definitions ? undefined : a.$defs,
+            b.$defs === b.definitions ? undefined : b.$defs
+        ) ?? definitions;
+
     // we have no node-type if (atype !== b.type) {return a; }
 
     // @ts-expect-error simplified merging of objects
@@ -103,7 +110,8 @@ export function mergeNode(a?: SchemaNode, b?: SchemaNode, ...omit: string[]): Sc
         propertyNames: mergeNode(a.propertyNames, b.propertyNames),
         unevaluatedProperties: mergeNode(a.unevaluatedProperties, b.unevaluatedProperties),
         unevaluatedItems: mergeNode(a.unevaluatedItems, b.unevaluatedItems),
-        $defs: mergeObjects(a.$defs, b.$defs),
+        $defs,
+        definitions,
         patternProperties: mergePatternProperties(a.patternProperties, b.patternProperties),
         properties: mergeObjects(a.properties, b.properties),
         required: combineArrays(a.required, b.required)

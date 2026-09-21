@@ -1,3 +1,4 @@
+import { join } from "@sagold/json-pointer";
 import { mergeSchema } from "../utils/mergeSchema";
 import { JsonSchema, SchemaNode } from "../types";
 import { isObject } from "../utils/isObject";
@@ -39,15 +40,18 @@ export function parsePatternProperties(node: SchemaNode) {
         return;
     }
 
-    node.patternProperties = patterns.map((pattern) => ({
-        name: pattern,
-        pattern: new RegExp(pattern, schema.regexFlags ?? REGEX_FLAGS),
-        node: node.compileSchema(
-            schema.patternProperties[pattern],
-            `${node.evaluationPath}/patternProperties/${pattern}`,
-            `${node.schemaLocation}/patternProperties/${pattern}`
-        )
-    }));
+    node.patternProperties = patterns.map((pattern) => {
+        const propertyPointer = join([pattern], true).slice(1);
+        return {
+            name: pattern,
+            pattern: new RegExp(pattern, schema.regexFlags ?? REGEX_FLAGS),
+            node: node.compileSchema(
+                schema.patternProperties[pattern],
+                `${node.evaluationPath}/patternProperties${propertyPointer}`,
+                `${node.schemaLocation}/patternProperties${propertyPointer}`
+            )
+        };
+    });
 
     return collectValidationErrors([], ...node.patternProperties.map(({ node }) => node));
 }

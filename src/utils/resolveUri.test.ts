@@ -95,6 +95,35 @@ describe("resolveUri", () => {
         assert.equal(url, "#/examples/0");
     });
 
+    it("normalizes equivalent pointer fragments in each URI resolution path", () => {
+        const root = "https://example.test/cost%24/root";
+        for (const [token, encoded] of [["cost$", "cost%24"], ["cost%24", "cost%24"], ["cost%2524", "cost%2524"]]) {
+            const pointer = `#/$defs/${token}`;
+            const normalized = `#/%24defs/${encoded}`;
+            assert.equal(resolveUri(pointer), normalized);
+            assert.equal(resolveUri(undefined, pointer), normalized);
+            assert.equal(resolveUri("#", pointer), normalized);
+            assert.equal(resolveUri("/base", pointer), normalized);
+            assert.equal(resolveUri(root, pointer), `${root}${normalized}`);
+            assert.equal(resolveUri(root, `${root}${pointer}`), `${root}${normalized}`);
+            assert.equal(resolveUri(root, `child${pointer}`), `https://example.test/cost%24/child${normalized}`);
+        }
+    });
+
+    it("preserves document URI and named-anchor spellings", () => {
+        const root = "https://example.test/cost%24/root";
+        for (const suffix of ["$", "%24"]) {
+            const document = `https://example.test/child${suffix}`;
+            const anchor = `#named${suffix}`;
+            assert.equal(resolveUri(document), document);
+            assert.equal(resolveUri(root, document), document);
+            assert.equal(resolveUri(root, `child${suffix}`), `https://example.test/cost%24/child${suffix}`);
+            assert.equal(resolveUri(anchor), anchor);
+            assert.equal(resolveUri(undefined, anchor), anchor);
+            assert.equal(resolveUri(root, anchor), `${root}${anchor}`);
+        }
+    });
+
     it("should correctly join url-encoded path", () => {
         const url = resolveUri(
             "json-schemer://schema",
