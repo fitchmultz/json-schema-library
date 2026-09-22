@@ -1,4 +1,3 @@
-import { isObject } from "../utils/isObject";
 import { isBooleanSchema, isJsonSchema, SchemaNode } from "../types";
 import { Keyword, JsonSchemaValidatorParams } from "../Keyword";
 import { validateNode } from "../validateNode";
@@ -49,22 +48,6 @@ function validateContains({ node, data, pointer, path }: JsonSchemaValidatorPara
     const { schema } = node;
     if (!Array.isArray(data)) {
         return;
-    }
-    if (schema.contains === false) {
-        return node.createError("contains-array-error", { pointer, value: data, schema });
-    }
-
-    if (schema.contains === true) {
-        if (Array.isArray(data) && data.length === 0) {
-            return node.createError("contains-any-error", { pointer, value: data, schema });
-        }
-        return undefined;
-    }
-
-    if (!isObject(schema.contains) || !Array.isArray(data)) {
-        // - ignore invalid schema
-        // - ignore invalid dara
-        return undefined;
     }
 
     let count = 0;
