@@ -31,7 +31,6 @@ import { isObject } from "./utils/isObject";
 import { join } from "@sagold/json-pointer";
 import { resolveUri } from "./utils/resolveUri";
 import { mergeNode } from "./mergeNode";
-import { omit } from "./utils/omit";
 import { pick } from "./utils/pick";
 import { render } from "./errors/render";
 import { TemplateOptions } from "./methods/getData";
@@ -477,12 +476,11 @@ export const SchemaNodeMethods = {
         }
 
         let schema;
-        // we need to copy node to prevent modification of source
-        // @todo does mergeNode break immutability?
-        let workingNode = node.compileSchema(node.schema, node.evaluationPath, node.schemaLocation);
+        // Keep compiled children in their own resource contexts while deriving this node.
+        let workingNode = { ...node };
         const reducers = node.reducers;
         for (const reducer of reducers) {
-            const result = reducer({ data, key, node, pointer, path: path ?? [] });
+            const result = reducer({ data, key, node, pointer, path: [...(path ?? []), { pointer, node }] });
             if (isJsonError(result)) {
                 return { node: undefined, error: result };
             }
@@ -507,10 +505,8 @@ export const SchemaNodeMethods = {
             path?.push({ pointer, node });
         }
 
-        // remove dynamic properties of node
-        workingNode.schema = omit(workingNode.schema, DECLARATOR_ONEOF, ...DYNAMIC_PROPERTIES);
-        // @ts-expect-error string accessing schema props
-        DYNAMIC_PROPERTIES.forEach((prop) => (workingNode[prop] = undefined));
+        // Retire reduced keywords and their callbacks together.
+        workingNode = mergeNode(workingNode, workingNode, DECLARATOR_ONEOF, ...DYNAMIC_PROPERTIES) as SchemaNode;
         return { node: workingNode, error: undefined };
     },
 
@@ -639,9 +635,9 @@ const noRefMergeDrafts = ["draft-04", "draft-06", "draft-07"];
 
 export function addKeywords(node: SchemaNode) {
     if (node.schema.$ref != null && noRefMergeDrafts.includes(node.context.version)) {
-        // for these draft versions only ref is validated
+        // Reference siblings are ignored; definitions remain available as targets.
         return node.context.keywords
-            .filter(({ keyword }) => whitelist.includes(keyword))
+            .filter(({ keyword }) => keyword === "$ref" || keyword === "$defs")
             .map((keyword) => execKeyword(keyword, node));
     }
     const keys = Object.keys(node.schema);

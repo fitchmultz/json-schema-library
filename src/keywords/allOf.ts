@@ -1,8 +1,7 @@
 import { mergeSchema } from "../utils/mergeSchema";
-import { mergeNode } from "../mergeNode";
-import { pick } from "../utils/pick";
+import { mergeNode, mergeReducedNode } from "../mergeNode";
 import { Keyword, JsonSchemaReducerParams, JsonSchemaValidatorParams, ValidationReturnType } from "../Keyword";
-import { SchemaNode } from "../types";
+import { isBooleanSchema, SchemaNode } from "../types";
 import { validateNode } from "../validateNode";
 import { collectValidationErrors } from "src/utils/collectValidationErrors";
 
@@ -58,9 +57,9 @@ function reduceAllOf({ node, data, key, pointer, path }: JsonSchemaReducerParams
             const localDynamicId = nestedDynamicId === "" ? `${KEYWORD}/${i}` : nestedDynamicId;
             dynamicId += `${dynamicId === "" ? "" : ","}${localDynamicId}`;
 
-            const schema = mergeSchema(node[KEYWORD][i].schema, schemaNode.schema);
-            mergedSchema = mergeSchema(mergedSchema, schema, KEYWORD, "contains");
-            mergedNode = mergeNode(mergedNode, schemaNode, KEYWORD, "contains");
+            const reduced = isBooleanSchema(node[KEYWORD][i].schema) ? node[KEYWORD][i] : schemaNode;
+            mergedSchema = mergeSchema(mergedSchema, reduced.schema, KEYWORD, "contains");
+            mergedNode = mergeNode(mergedNode, reduced, KEYWORD, "contains");
         }
     }
 
@@ -70,15 +69,7 @@ function reduceAllOf({ node, data, key, pointer, path }: JsonSchemaReducerParams
         node.schemaLocation,
         `${node.schemaLocation}(${dynamicId})`
     );
-    if (!mergedNode?.toSchemaNodes().some((child) => child.context !== node.context || child.$id !== node.$id)) {
-        return result;
-    }
-    // Keep foreign resource contexts instead of rebasing their child references onto this allOf.
-    return {
-        ...result,
-        ...mergeNode(result, mergedNode, KEYWORD, "contains"),
-        ...pick(result, "schema", "context", "$id", "schemaLocation", "evaluationPath", "dynamicId")
-    };
+    return mergeReducedNode(result, mergedNode, KEYWORD, "contains");
 }
 
 function validateAllOf({ node, data, pointer, path }: JsonSchemaValidatorParams) {

@@ -1,4 +1,5 @@
 import { mergeSchema } from "../utils/mergeSchema";
+import { mergeNode, mergeReducedNode } from "../mergeNode";
 import { isObject } from "../utils/isObject";
 import { isSchemaNode, SchemaNode, JsonSchema, isBooleanSchema } from "../types";
 import { Keyword, JsonSchemaReducerParams, JsonSchemaValidatorParams, ValidationAnnotation } from "../Keyword";
@@ -65,7 +66,7 @@ export function parseDependentSchemas(node: SchemaNode) {
     return errors;
 }
 
-export function reduceDependentSchemas({ node, data }: JsonSchemaReducerParams) {
+export function reduceDependentSchemas({ node, data, key, pointer, path }: JsonSchemaReducerParams) {
     const { dependentSchemas } = node;
     if (!isObject(data) || dependentSchemas == null) {
         // @todo remove dependentSchemas
@@ -73,6 +74,7 @@ export function reduceDependentSchemas({ node, data }: JsonSchemaReducerParams) 
     }
 
     let mergedSchema: JsonSchema | undefined;
+    let mergedNode: SchemaNode | undefined;
     let added = 0;
     let dynamicId = `${node.schemaLocation}(`;
     Object.keys(data).forEach((propertyName) => {
@@ -81,7 +83,13 @@ export function reduceDependentSchemas({ node, data }: JsonSchemaReducerParams) 
         }
         mergedSchema = mergedSchema ?? { properties: {} };
         if (isSchemaNode(dependentSchemas[propertyName])) {
-            mergedSchema = mergeSchema(mergedSchema, dependentSchemas[propertyName].schema);
+            const { node: reduced } = dependentSchemas[propertyName].reduceNode(data, {
+                key, pointer, path: [...path]
+            });
+            if (reduced) {
+                mergedSchema = mergeSchema(mergedSchema, reduced.schema);
+                mergedNode = mergeNode(mergedNode, reduced, KEYWORD);
+            }
         } else {
             mergedSchema.properties[propertyName] = dependentSchemas[propertyName];
         }
@@ -94,7 +102,8 @@ export function reduceDependentSchemas({ node, data }: JsonSchemaReducerParams) 
     }
 
     mergedSchema = mergeSchema(node.schema, mergedSchema, KEYWORD);
-    return node.compileSchema(mergedSchema, node.evaluationPath, node.schemaLocation, `${dynamicId})`);
+    const result = node.compileSchema(mergedSchema, node.evaluationPath, node.schemaLocation, `${dynamicId})`);
+    return mergeReducedNode(result, mergedNode, KEYWORD);
 }
 
 export function validateDependentSchemas({ node, data, pointer, path }: JsonSchemaValidatorParams) {
