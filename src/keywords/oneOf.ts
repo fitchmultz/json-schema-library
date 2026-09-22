@@ -316,7 +316,7 @@ function validateFromDeclarator({ node, data, pointer = "#", path }: JsonSchemaV
     const matches: { index: number; node: SchemaNode }[] = [];
     const errors: ValidationReturnType = [];
     for (const oneOfNode of oneOf) {
-        const { node: oneOfPropertyNode, error } = oneOfNode.getNodeChild(oneOfProperty, oneOfValue);
+        const { node: oneOfPropertyNode, error } = oneOfNode.getNodeChild(oneOfProperty, data);
         if (oneOfPropertyNode) {
             const validationResult = validateNode(
                 oneOfPropertyNode,

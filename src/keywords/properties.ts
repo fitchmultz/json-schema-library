@@ -22,7 +22,10 @@ export const propertiesKeyword: Keyword = {
     validate: validateProperties
 };
 
-function propertyResolver({ node, key }: JsonSchemaResolverParams) {
+function propertyResolver({ node, key, data }: JsonSchemaResolverParams) {
+    if (data !== undefined && !isObject(data)) {
+        return;
+    }
     return node.properties?.[key];
 }
 

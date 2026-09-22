@@ -64,7 +64,7 @@ function validateUnevaluatedProperties({ node, data, pointer, path }: JsonSchema
         if (node.properties?.[propertyName]) {
             continue;
         }
-        if (isPropertyEvaluated({ node, data, key: propertyName, pointer, path })) {
+        if (isPropertyEvaluated({ node, data, key: propertyName, pointer, path, skipUnevaluated: true })) {
             continue;
         }
 

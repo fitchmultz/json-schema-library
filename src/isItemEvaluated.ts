@@ -1,5 +1,5 @@
 import { ValidationPath } from "./Keyword";
-import { isJsonError, SchemaNode } from "./types";
+import { isJsonError, isSchemaNode, SchemaNode } from "./types";
 import { getValue } from "./utils/getValue";
 import { validateNode } from "./validateNode";
 
@@ -14,6 +14,8 @@ type Options = {
     pointer: string;
 
     path: ValidationPath;
+    /** The current keyword cannot consume its own annotations. */
+    skipUnevaluated?: boolean;
 };
 
 /**
@@ -23,10 +25,19 @@ type Options = {
  * - This function currently checks for schema that are not visible by simple validation
  * - We could introduce this method as a new keyword-layer
  */
-export function isItemEvaluated({ node, data, key, pointer, path }: Options) {
+export function isItemEvaluated({ node, data, key, pointer, path, skipUnevaluated }: Options): boolean {
+    path = [...path, { pointer, node }];
     const value = getValue(data, key);
 
     if (node.schema.unevaluatedItems === true || node.schema.items === true) {
+        return true;
+    }
+
+    if (
+        !skipUnevaluated &&
+        node.unevaluatedItems &&
+        !validateNode(node.unevaluatedItems, value, `${pointer}/${key}`, path).some(isJsonError)
+    ) {
         return true;
     }
 
@@ -86,4 +97,10 @@ export function isItemEvaluated({ node, data, key, pointer, path }: Options) {
             }
         }
     }
+
+    const resolved = node.resolveRef({ pointer, path });
+    if (resolved !== node && isSchemaNode(resolved)) {
+        return isItemEvaluated({ node: resolved, data, key, pointer, path });
+    }
+    return false;
 }

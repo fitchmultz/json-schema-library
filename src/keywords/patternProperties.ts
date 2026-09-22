@@ -52,7 +52,10 @@ export function parsePatternProperties(node: SchemaNode) {
     return collectValidationErrors([], ...node.patternProperties.map(({ node }) => node));
 }
 
-function patternPropertyResolver({ node, key }: JsonSchemaResolverParams) {
+function patternPropertyResolver({ node, key, data }: JsonSchemaResolverParams) {
+    if (data !== undefined && !isObject(data)) {
+        return;
+    }
     return node.patternProperties?.find(({ pattern }) => pattern.test(`${key}`))?.node;
 }
 
