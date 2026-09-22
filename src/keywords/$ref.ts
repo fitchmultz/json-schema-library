@@ -111,7 +111,11 @@ export function reduceRef({ node, data, key, pointer, path }: JsonSchemaReducerP
         return result.node ?? result.error;
     }
 
-    if (resolvedNode.schemaLocation === node.schemaLocation) {
+    if (
+        resolvedNode.context === node.context &&
+        resolvedNode.$id === node.$id &&
+        resolvedNode.schemaLocation === node.schemaLocation
+    ) {
         return resolvedNode;
     }
     const merged = mergeNode(node, resolvedNode) as SchemaNode;

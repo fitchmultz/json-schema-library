@@ -77,25 +77,29 @@ export function reduceDependentSchemas({ node, data, key, pointer, path }: JsonS
     let mergedNode: SchemaNode | undefined;
     let added = 0;
     let dynamicId = `${node.schemaLocation}(`;
-    Object.keys(data).forEach((propertyName) => {
-        if (dependentSchemas[propertyName] == null) {
-            return;
+    for (const propertyName of Object.keys(data)) {
+        const dependency = dependentSchemas[propertyName];
+        if (dependency == null) {
+            continue;
         }
-        mergedSchema = mergedSchema ?? { properties: {} };
-        if (isSchemaNode(dependentSchemas[propertyName])) {
-            const { node: reduced } = dependentSchemas[propertyName].reduceNode(data, {
+        if (dependency === false) {
+            return node.compileSchema(
+                false, node.evaluationPath, node.schemaLocation, `${node.schemaLocation}(${KEYWORD}/${propertyName})`
+            );
+        }
+        mergedSchema = mergedSchema ?? {};
+        if (isSchemaNode(dependency)) {
+            const { node: reduced } = dependency.reduceNode(data, {
                 key, pointer, path: [...path]
             });
             if (reduced) {
                 mergedSchema = mergeSchema(mergedSchema, reduced.schema);
                 mergedNode = mergeNode(mergedNode, reduced, KEYWORD);
             }
-        } else {
-            mergedSchema.properties[propertyName] = dependentSchemas[propertyName];
         }
         dynamicId += `${added ? "," : ""}${KEYWORD}/${propertyName}`;
         added++;
-    });
+    }
 
     if (mergedSchema == null) {
         return node;
