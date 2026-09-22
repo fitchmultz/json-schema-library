@@ -1,15 +1,17 @@
 import { join, split } from "@sagold/json-pointer";
-import { resolve } from "uri-js";
+import { normalize, resolve } from "uri-js";
 
 const suffixes = /(#)+$/;
 const trailingHash = /#$/;
 const isDomain = /^[^:]+:\/\/[^/]+\//;
 const idAndPointer = /#.*$/;
 
-function normalizePointerRef(ref: string) {
-    const fragment = ref.indexOf("#/");
-    // Normalize only pointer fragments, leaving document URIs and named anchors intact.
-    return fragment < 0 ? ref : `${ref.slice(0, fragment)}${join(split(ref.slice(fragment)), true)}`;
+function normalizeFragment(ref: string) {
+    const index = ref.indexOf("#");
+    if (index < 0) return ref;
+    const fragment = ref.slice(index);
+    // Keep document IDs intact; URI normalization decodes only unreserved anchor characters.
+    return ref.slice(0, index) + (fragment.startsWith("#/") ? join(split(fragment), true) : normalize(fragment));
 }
 
 /**
@@ -22,10 +24,10 @@ function normalizePointerRef(ref: string) {
  */
 export function resolveUri(base?: string, ref?: string): string {
     if (base != null) {
-        base = normalizePointerRef(base);
+        base = normalizeFragment(base);
     }
     if (ref != null) {
-        ref = normalizePointerRef(ref);
+        ref = normalizeFragment(ref);
     }
 
     if (ref == null) {

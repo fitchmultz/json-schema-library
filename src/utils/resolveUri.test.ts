@@ -110,7 +110,22 @@ describe("resolveUri", () => {
         }
     });
 
-    it("preserves document URI and named-anchor spellings", () => {
+    it("normalizes unreserved characters in named-anchor fragments", () => {
+        const root = "https://example.test/cost%24/root";
+        for (const anchor of ["#node", "#n%6Fde", "#%6eode"]) {
+            assert.equal(resolveUri(anchor), "#node");
+            assert.equal(resolveUri(undefined, anchor), "#node");
+            assert.equal(resolveUri("#", anchor), "#node");
+            assert.equal(resolveUri("/base", anchor), "#node");
+            assert.equal(resolveUri(root, anchor), `${root}#node`);
+            assert.equal(resolveUri(root, `${root}${anchor}`), `${root}#node`);
+            assert.equal(resolveUri(root, `child${anchor}`), "https://example.test/cost%24/child#node");
+        }
+        assert.equal(resolveUri("#A%5F%2D%2E%7E%30"), "#A_-.~0");
+        assert.equal(resolveUri("#n%256Fde"), "#n%256Fde");
+    });
+
+    it("preserves document URI and reserved named-anchor characters", () => {
         const root = "https://example.test/cost%24/root";
         for (const suffix of ["$", "%24"]) {
             const document = `https://example.test/child${suffix}`;
