@@ -51,7 +51,7 @@ function parseRef(node: SchemaNode) {
     register(node, resolveUri(node.context.rootNode.$id, node.evaluationPath));
 
     // precompile reference
-    if (node.schema.$ref) {
+    if (node.schema.$ref != null) {
         node.$ref = resolveUri(currentId, node.schema.$ref);
     }
 }
@@ -128,12 +128,12 @@ function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonError | u
             const referencedNode = node.context.remotes[$remoteHostRef];
             // resolve full ref on remote schema - we store currently only store ref with domain
             let nextNode = getRef(referencedNode, $ref);
-            if (nextNode) {
+            if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
             // @note required for test spec 04
             nextNode = getRef(referencedNode, fragments[1]);
-            if (nextNode) {
+            if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
         }

@@ -115,6 +115,45 @@ describe("reference validation scope", () => {
         });
     }
 
+    for (const [name, anchor, expectedKind, rejectedKind] of [
+        ["omitted", {}, "B", "A"],
+        ["false", { $recursiveAnchor: false }, "B", "A"],
+        ["true", { $recursiveAnchor: true }, "A", "B"]
+    ] as const) {
+        it(`should gate recursive rebinding on the initial target's anchor (${name})`, () => {
+            const $schema = "https://json-schema.org/draft/2019-09/schema";
+            const node = compileSchema({
+                $schema,
+                $id: "https://example.com/a",
+                $recursiveAnchor: true,
+                type: "object",
+                required: ["kind"],
+                properties: { kind: { const: "A" }, b: { $ref: "https://example.com/b" } }
+            }).addRemoteSchema("https://example.com/b", {
+                $schema,
+                $id: "https://example.com/b",
+                ...anchor,
+                type: "object",
+                required: ["kind"],
+                properties: { kind: { const: "B" }, child: { $recursiveRef: "#" } }
+            });
+            const valid = { kind: "A", b: { kind: "B", child: { kind: expectedKind } } };
+            assert.deepEqual(
+                [
+                    node.validate(valid).valid,
+                    node.validate({ kind: "A", b: { kind: "B", child: { kind: rejectedKind } } }).valid,
+                    node.validate({ kind: "A", b: { kind: "B", child: 1 } }).valid
+                ],
+                [true, false, false]
+            );
+            assert.equal(
+                node.getNode("#/b/child/kind", valid, { path: [{ pointer: "#", node }] }).node?.schema.const,
+                expectedKind
+            );
+            assert.equal(node.validate(valid).valid, true);
+        });
+    }
+
     it("should isolate referenced resources when checking unevaluated properties", () => {
         const $schema = "https://json-schema.org/draft/2020-12/schema";
         const node = compileSchema({

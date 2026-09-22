@@ -638,7 +638,7 @@ const whitelist = ["$ref", "if", "$defs"];
 const noRefMergeDrafts = ["draft-04", "draft-06", "draft-07"];
 
 export function addKeywords(node: SchemaNode) {
-    if (node.schema.$ref && noRefMergeDrafts.includes(node.context.version)) {
+    if (node.schema.$ref != null && noRefMergeDrafts.includes(node.context.version)) {
         // for these draft versions only ref is validated
         return node.context.keywords
             .filter(({ keyword }) => whitelist.includes(keyword))

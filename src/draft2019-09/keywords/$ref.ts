@@ -48,7 +48,7 @@ export function parseRef(node: SchemaNode) {
     }
 
     // precompile reference
-    if (node.schema.$ref) {
+    if (node.schema.$ref != null) {
         node.$ref = resolveUri(currentId, node.schema.$ref);
         if (node.$ref.startsWith("/")) {
             node.$ref = `#${node.$ref}`;
@@ -103,6 +103,11 @@ function validateRef({ node, data, pointer = "#", path }: JsonSchemaValidatorPar
 
 // 1. https://json-schema.org/draft/2019-09/json-schema-core#scopes
 function resolveRecursiveRef(node: SchemaNode, path: ValidationPath): SchemaNode | JsonError {
+    const initialTarget = getRef(node, resolveUri(node.$id, node.schema.$recursiveRef));
+    // Only an initial target that enables recursion can rebind through the dynamic scope.
+    if (!isSchemaNode(initialTarget) || initialTarget.schema.$recursiveAnchor !== true) {
+        return initialTarget;
+    }
     const history = path;
 
     // RESTRICT BY CHANGE IN BASE-URL
@@ -111,7 +116,7 @@ function resolveRecursiveRef(node: SchemaNode, path: ValidationPath): SchemaNode
     for (let i = history.length - 1; i >= 0; i--) {
         if (history[i].node.schema.$recursiveAnchor === false) {
             // $recursiveRef with $recursiveAnchor: false works like $ref
-            return getRef(node, resolveUri(node.$id, node.schema.$recursiveRef));
+            return initialTarget;
         }
         if (/^https?:\/\//.test(history[i].node.schema.$id ?? "") && history[i].node.schema.$recursiveAnchor !== true) {
             startIndex = i;
@@ -125,9 +130,7 @@ function resolveRecursiveRef(node: SchemaNode, path: ValidationPath): SchemaNode
         return firstAnchor.node;
     }
 
-    // $recursiveRef with no $recursiveAnchor works like $ref?
-    const nextNode = getRef(node, resolveUri(node.$id, node.schema.$recursiveRef));
-    return nextNode;
+    return initialTarget;
 }
 
 export default function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonError {
@@ -192,12 +195,12 @@ export default function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode 
             const referencedNode = node.context.remotes[$remoteHostRef];
             // resolve full ref on remote schema - we store currently only store ref with domain
             let nextNode = getRef(referencedNode, $ref);
-            if (nextNode) {
+            if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
             // @note required for test spec 04
             nextNode = getRef(referencedNode, fragments[1]);
-            if (nextNode) {
+            if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
         }

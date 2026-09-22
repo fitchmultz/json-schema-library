@@ -47,7 +47,7 @@ function parseRef(node: SchemaNode) {
     }
 
     // precompile reference
-    if (node.schema.$ref) {
+    if (node.schema.$ref != null) {
         node.$ref = resolveUri(currentId, node.schema.$ref);
     }
 }

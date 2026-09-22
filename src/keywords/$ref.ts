@@ -68,7 +68,7 @@ export function parseRef(node: SchemaNode) {
     }
 
     // precompile reference
-    if (node.schema.$ref) {
+    if (node.schema.$ref != null) {
         node.$ref = resolveUri(currentId, node.schema.$ref);
         if (node.$ref.startsWith("/")) {
             node.$ref = `#${node.$ref}`;
@@ -112,7 +112,7 @@ export function reduceRef({ node, data, key, pointer, path }: JsonSchemaReducerP
 }
 
 export function resolveRef(this: SchemaNode, { pointer, path = [] }: { pointer?: string; path?: ValidationPath } = {}) {
-    if (this.schema.$dynamicRef) {
+    if (this.schema.$dynamicRef != null) {
         const nextNode = resolveRecursiveRef(this, path);
         if (isJsonError(nextNode)) {
             return nextNode;
@@ -247,12 +247,12 @@ export function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonEr
             const referencedNode = node.context.remotes[$remoteHostRef];
             // resolve full ref on remote schema - we store currently only store ref with domain
             let nextNode = getRef(referencedNode, $ref);
-            if (nextNode) {
+            if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
             // @note required for test spec 04
             nextNode = getRef(referencedNode, fragments[1]);
-            if (nextNode) {
+            if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
         }

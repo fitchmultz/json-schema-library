@@ -56,6 +56,7 @@ describe("reference child locations", () => {
                 const result = reachable.resolveRef();
                 assert.ok(isJsonError(result));
                 assert.equal(result.code, "ref-error");
+                assert.ok(typeof result.data.ref === "string");
                 assert.equal(decodeURIComponent(result.data.ref), missing);
             });
 
@@ -144,6 +145,153 @@ describe("reference child locations", () => {
         assert.equal(target.validate("").valid, false);
         assert.equal(node.compileSchema({}, "#/properties/xy").schemaLocation, "#/properties/x/properties/xy");
         assert.equal(node.compileSchema({}, "$dynamic").schemaLocation, "#/properties/x/%24dynamic");
+    });
+});
+
+describe("registered remote fragments", () => {
+    const uri = "https://example.test/old";
+    const fragment = "#/definitions/tuple";
+    const tuple = { type: "array", items: [{ type: "string" }], additionalItems: false };
+    const remoteSchema = () => ({
+        $schema: "http://json-schema.org/draft-07/schema#",
+        $ref: fragment,
+        definitions: { tuple: structuredClone(tuple) }
+    });
+
+    // Exercise each reference resolver with a separately registered draft-07 document.
+    for (const draft of [undefined, "draft-2019-09", "draft-04"]) {
+        it(`should resolve a fragment below a remote root reference (${draft ?? "default"})`, () => {
+            const node = compileSchema({ ...(draft ? { $schema: draft } : {}), $ref: `${uri}${fragment}` });
+            node.addRemoteSchema(uri, remoteSchema());
+            const remote = node.context.remotes[uri];
+            const refs = { ...remote.context.refs };
+            const target = node.resolveRef();
+            assert.ok(isSchemaNode(target));
+            assert.equal(target === node || target === remote, false);
+            assert.equal(target.context.rootNode === remote, true);
+            assert.equal(target.getDraftVersion(), "draft-07");
+            assert.equal(target.schemaLocation, fragment);
+            assert.deepEqual(target.schema, tuple);
+            assert.deepEqual(
+                [["ok"], [1], ["ok", "extra"]].map((value) => node.validate(value).valid),
+                [true, false, false]
+            );
+            assert.equal(node.validate(["ok"]).valid, true);
+            assert.deepEqual(remote.context.refs, refs);
+        });
+
+        it(`should refuse a missing fragment below a remote root reference (${draft ?? "default"})`, () => {
+            const ref = `${uri}#/definitions/missing`;
+            const node = compileSchema({ ...(draft ? { $schema: draft } : {}), $ref: ref });
+            node.addRemoteSchema(uri, remoteSchema());
+            const target = node.resolveRef();
+            assert.equal(isSchemaNode(target), false);
+            if (isJsonError(target)) {
+                assert.equal(target.code, "ref-error");
+            }
+            const result = node.validate(["ok"]);
+            assert.equal(result.valid, false);
+            assert.equal(result.errors[0].code, "ref-error");
+        });
+    }
+
+    for (const control of ["root URI", "local fragment", "remote without root reference"]) {
+        it(`should preserve the working ${control} control`, () => {
+            const schema = remoteSchema();
+            const node =
+                control === "local fragment"
+                    ? compileSchema(schema)
+                    : compileSchema({ $ref: control === "root URI" ? uri : `${uri}${fragment}` });
+            if (control !== "local fragment") {
+                const { $schema, definitions } = schema;
+                node.addRemoteSchema(uri, control === "root URI" ? schema : { $schema, definitions });
+            }
+            const target = node.resolveRef();
+            assert.ok(isSchemaNode(target));
+            const tupleNode = control === "root URI" ? target.resolveRef() : target;
+            assert.ok(isSchemaNode(tupleNode));
+            assert.deepEqual(tupleNode.schema, tuple);
+            assert.deepEqual(
+                [["ok"], [1], ["ok", "extra"]].map((value) => node.validate(value).valid),
+                [true, false, false]
+            );
+        });
+    }
+});
+
+describe("empty URI references", () => {
+    for (const draft of ["draft-04", "draft-06", "draft-07", "draft-2019-09", "draft-2020-12"]) {
+        const id = draft === "draft-04" ? "id" : "$id";
+        for (const base of ["anonymous", "named", "nested"]) {
+            it(`should resolve an empty reference against the current resource (${draft}, ${base})`, () => {
+                const schema = {
+                    type: "object",
+                    properties: { value: { type: "number" }, child: { $ref: "" } },
+                    additionalProperties: false
+                };
+                const root = compileSchema({
+                    $schema: draft,
+                    ...(base === "anonymous" ? {} : { [id]: "https://example.com/root" }),
+                    ...(base === "nested"
+                        ? { type: "object", properties: { nested: { [id]: "nested", ...schema } } }
+                        : schema)
+                });
+                const resource = base === "nested" ? root.properties!.nested : root;
+                const ref = resource.properties!.child;
+                const target = ref.resolveRef();
+                assert.ok(isSchemaNode(target));
+                // Check the target before validating recursive data.
+                assert.equal(target === ref, false);
+                assert.equal(target.schemaLocation, resource.schemaLocation);
+                assert.equal(
+                    ref.$ref,
+                    base === "anonymous" ? "#" : `https://example.com/${base === "nested" ? "nested" : "root"}`
+                );
+                assert.equal(target.type, "object");
+                assert.deepEqual(target.schema.properties, schema.properties);
+
+                const wrap = (data: unknown) => (base === "nested" ? { nested: data } : data);
+                const valid = wrap({ value: 1, child: { value: 2 } });
+                assert.equal(root.validate(wrap({})).valid, true);
+                assert.equal(root.validate(wrap({ child: {} })).valid, true);
+                assert.equal(root.validate(valid).valid, true);
+                assert.equal(root.validate(wrap({ child: 1 })).valid, false);
+                assert.equal(root.validate(wrap({ child: { value: "invalid" } })).valid, false);
+                assert.equal(root.validate(wrap({ child: { unexpected: true } })).valid, false);
+                const pointer = base === "nested" ? "#/nested/child/value" : "#/child/value";
+                assert.equal(root.getNode(pointer, valid).node?.type, "number");
+                assert.equal(root.validate(valid).valid, true);
+            });
+        }
+
+        it(`should apply the draft's sibling-keyword rules to an empty reference (${draft})`, () => {
+            const root = compileSchema({
+                $schema: draft,
+                type: "object",
+                properties: { child: { $ref: "", type: "string" } }
+            });
+            const ref = root.properties!.child;
+            assert.equal(ref.resolveRef() === ref, false);
+            const ignoresSiblings = ["draft-04", "draft-06", "draft-07"].includes(draft);
+            assert.equal(root.validate({ child: {} }).valid, ignoresSiblings);
+            assert.equal(root.validate({ child: "invalid" }).valid, false);
+        });
+    }
+    it("should resolve an empty dynamic reference as an ordinary root reference", () => {
+        const root = compileSchema({
+            $schema: "draft-2020-12",
+            type: "object",
+            properties: { value: { type: "number" }, child: { $dynamicRef: "" } },
+            additionalProperties: false
+        });
+        const ref = root.properties!.child;
+        const target = ref.resolveRef();
+        assert.ok(isSchemaNode(target));
+        assert.equal(target === ref, false);
+        assert.equal(target.schemaLocation, "#");
+        assert.equal(root.validate({ value: 1, child: { value: 2 } }).valid, true);
+        assert.equal(root.validate({ child: 1 }).valid, false);
+        assert.equal(root.validate({ child: { value: "invalid" } }).valid, false);
     });
 });
 
