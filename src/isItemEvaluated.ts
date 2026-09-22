@@ -1,3 +1,4 @@
+import { resolveNodeChild } from "./getNodeChild";
 import { ValidationPath } from "./Keyword";
 import { isJsonError, isSchemaNode, SchemaNode } from "./types";
 import { getValue } from "./utils/getValue";
@@ -45,6 +46,11 @@ export function isItemEvaluated({ node, data, key, pointer, path, skipUnevaluate
         return true;
     }
 
+    const child = resolveNodeChild(node, key, data, { pointer, path })?.node;
+    if (child && !validateNode(child, value, `${pointer}/${key}`, path).some(isJsonError)) {
+        return true;
+    }
+
     if (node.allOf) {
         for (const allOf of node.allOf) {
             if (isItemEvaluated({ node: allOf, data, key, pointer, path })) {
@@ -79,11 +85,6 @@ export function isItemEvaluated({ node, data, key, pointer, path, skipUnevaluate
     if (node.if) {
         const validIf = !validateNode(node.if, data, pointer, path).some(isJsonError);
         if (validIf && isItemEvaluated({ node: node.if, data, key, pointer, path })) {
-            return true;
-        }
-
-        if (validIf && node.if.prefixItems && node.if.prefixItems.length > key) {
-            // evaluated by if
             return true;
         }
 

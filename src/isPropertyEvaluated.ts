@@ -1,3 +1,4 @@
+import { resolveNodeChild } from "./getNodeChild";
 import { ValidationPath } from "./Keyword";
 import { isJsonError, isSchemaNode, SchemaNode } from "./types";
 import { appendDataPointer } from "./utils/appendDataPointer";
@@ -49,6 +50,11 @@ export function isPropertyEvaluated({ node, data, key, pointer, path, skipUneval
     }
 
     if (node.patternProperties && node.patternProperties.find((p) => p.pattern.test(key))) {
+        return true;
+    }
+
+    const child = resolveNodeChild(node, key, data, { pointer, path })?.node;
+    if (child && !validateNode(child, data[key], appendDataPointer(pointer, key), path).some(isJsonError)) {
         return true;
     }
 
