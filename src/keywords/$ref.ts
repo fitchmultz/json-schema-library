@@ -119,7 +119,8 @@ export function reduceRef({ node, data, key, pointer, path }: JsonSchemaReducerP
     return reducedNode ?? error;
 }
 
-export function resolveRef(this: SchemaNode, { pointer, path = [] }: { pointer?: string; path?: ValidationPath } = {}) {
+export function resolveRef(this: SchemaNode, options: { pointer?: string; path?: ValidationPath } = {}): SchemaNode | JsonError {
+    const { pointer, path = [] } = options;
     if (this.schema.$dynamicRef != null) {
         const nextNode = resolveRecursiveRef(this, path);
         if (isJsonError(nextNode)) {
@@ -129,6 +130,10 @@ export function resolveRef(this: SchemaNode, { pointer, path = [] }: { pointer?:
         return nextNode;
     }
 
+    return resolveStaticRef.call(this, options);
+}
+
+export function resolveStaticRef(this: SchemaNode, { pointer, path = [] }: { pointer?: string; path?: ValidationPath } = {}) {
     if (this.$ref == null) {
         return this;
     }

@@ -28,6 +28,23 @@ function reachable(root: SchemaNode) {
     return targets;
 }
 
+for (const draft of ["draft-06", "draft-07"]) {
+    it(`should ignore newer reference keywords while preserving static references (${draft})`, () => {
+        for (const withRef of [false, true]) {
+            const constraint = { type: "string", minLength: 2 };
+            const node = compileSchema({
+                $schema: draft,
+                $dynamicRef: "https://example.test/unregistered",
+                ...(withRef ? { $ref: "#/definitions/text", definitions: { text: constraint } } : constraint)
+            });
+            const target = node.resolveRef();
+            assert.ok(isSchemaNode(target));
+            assert.equal(target.type, "string");
+            assert.deepEqual(["valid", 1, "x"].map((value) => node.validate(value).valid), [true, false, false]);
+        }
+    });
+}
+
 for (const [draft, anchor, ref, refValue] of [
     ["2019-09", "$recursiveAnchor", "$recursiveRef", "#"],
     ["2020-12", "$dynamicAnchor", "$dynamicRef", "#node"]

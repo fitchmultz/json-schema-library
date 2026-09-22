@@ -1,5 +1,5 @@
 import { Keyword, JsonSchemaValidatorParams, ValidationPath } from "../../Keyword";
-import { resolveRef } from "../../keywords/$ref";
+import { resolveStaticRef as resolveRef } from "../../keywords/$ref";
 import { isSchemaNode, SchemaNode } from "../../types";
 import { resolveUri } from "../../utils/resolveUri";
 import { validateNode } from "../../validateNode";
