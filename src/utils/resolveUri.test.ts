@@ -110,6 +110,24 @@ describe("resolveUri", () => {
         }
     });
 
+    it("normalizes encoded pointer separators without decoding literal percent names twice", () => {
+        const root = "https://example.test/path%2Froot";
+        for (const fragment of ["#/$defs/target", "#%2F$defs%2Ftarget", "#%2f%24defs%2ftarget", "#/$defs%2Ftarget"]) {
+            const expected = "#/%24defs/target";
+            assert.equal(resolveUri(fragment), expected);
+            assert.equal(resolveUri(undefined, fragment), expected);
+            assert.equal(resolveUri("#", fragment), expected);
+            assert.equal(resolveUri("/base", fragment), expected);
+            assert.equal(resolveUri(root, fragment), `${root}${expected}`);
+            assert.equal(resolveUri(root, `${root}${fragment}`), `${root}${expected}`);
+            assert.equal(resolveUri(root, `child${fragment}`), `https://example.test/child${expected}`);
+        }
+        assert.equal(resolveUri("#%2F$defs%2Fa%252Fb"), "#/%24defs/a%252Fb");
+        assert.equal(resolveUri("#%2F$defs%2Fa%23%252Fb"), "#/%24defs/a%23%252Fb");
+        assert.equal(resolveUri("#%252F$defs%2Ftarget"), "#%252F$defs%2Ftarget");
+        assert.equal(resolveUri("#named%2Fpart"), "#named%2Fpart");
+    });
+
     it("normalizes unreserved characters in named-anchor fragments", () => {
         const root = "https://example.test/cost%24/root";
         for (const anchor of ["#node", "#n%6Fde", "#%6eode"]) {

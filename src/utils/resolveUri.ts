@@ -10,8 +10,9 @@ function normalizeFragment(ref: string) {
     const index = ref.indexOf("#");
     if (index < 0) return ref;
     const fragment = ref.slice(index);
-    // Keep document IDs intact; URI normalization decodes only unreserved anchor characters.
-    return ref.slice(0, index) + (fragment.startsWith("#/") ? join(split(fragment), true) : normalize(fragment));
+    // Decode separators before the pointer parser decodes each token, preserving literal percent names.
+    const pointer = fragment.replace(/%2f/gi, "/");
+    return ref.slice(0, index) + (pointer.startsWith("#/") ? join(split(pointer), true) : normalize(fragment));
 }
 
 /**

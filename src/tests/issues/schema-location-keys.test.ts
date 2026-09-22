@@ -7,7 +7,7 @@ import { draft2019 } from "../../draft2019";
 import { draft2020 } from "../../draft2020";
 import { extendDraft } from "../../Draft";
 import { propertyDependenciesKeyword } from "../../keywords/propertyDependencies";
-import { isJsonError, JsonSchema } from "../../types";
+import { isJsonError, isSchemaNode, JsonSchema } from "../../types";
 
 // Literal names and their RFC 6901 URI-fragment tokens, independent of the encoder under test.
 const keys = [
@@ -25,6 +25,41 @@ for (const draft of [draft04, draft06, draft07, draft2019, draft2020]) {
         const keywords = ["$defs", "definitions", "properties", "patternProperties", "dependencies", "dependentSchemas"].filter(
             (keyword) => draft.keywords.some((entry) => entry.keyword === (keyword === "definitions" ? "$defs" : keyword))
         );
+
+        it("resolves encoded pointer separators before selecting schema locations", () => {
+            const id = draft.version === "draft-04" ? "id" : "$id";
+            for (const [ref, type, valid, wrongType, wrongValue] of [
+                ["#/definitions/target", "string", "valid", 1, "x"],
+                ["#%2Fdefinitions%2Ftarget", "string", "valid", 1, "x"],
+                ["#%2fdefinitions%2ftarget", "string", "valid", 1, "x"],
+                ["#/definitions%2Ftarget", "string", "valid", 1, "x"],
+                ["#%2Fdefinitions%2Fa%252Fb", "number", 2, "wrong", 1],
+                ["#%2Fdefinitions%2Fa%23%252Fb", "boolean", true, 1, false]
+            ] as const) {
+                const node = compileSchema({
+                    [id]: "https://example.test/path%2Froot",
+                    definitions: {
+                        target: { type: "string", minLength: 2 },
+                        "a%2Fb": { type: "number", minimum: 2 },
+                        "a#%2Fb": { type: "boolean", enum: [true] },
+                        "a/b": { type: "string" },
+                        "a#/b": { type: "number" }
+                    },
+                    "/definitions/target": { type: "number" },
+                    "definitions/target": { type: "number" },
+                    properties: { child: { $ref: ref } }
+                }, options);
+                const child = node.properties?.child;
+                assert.ok(child);
+                const target = child.resolveRef();
+                assert.ok(isSchemaNode(target), ref);
+                assert.equal(target.type, type, ref);
+                assert.deepEqual(
+                    [valid, wrongType, wrongValue].map((value) => node.validate({ child: value }).valid),
+                    [true, false, false], ref
+                );
+            }
+        });
 
         for (const keyword of keywords) {
             it(`preserves literal ${keyword} keys in references, locations and traversal`, () => {
