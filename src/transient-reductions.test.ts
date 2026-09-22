@@ -71,6 +71,41 @@ describe("transient schema reductions", () => {
     }
 
     for (const draft of ["draft-04", "draft-06", "draft-07", "draft-2019-09", "draft-2020-12"]) {
+        it(`should validate recursive references without retaining expansions (${draft})`, () => {
+            const node = compileSchema(
+                {
+                    type: "object",
+                    properties: { a: { $ref: "#" }, b: { $ref: "#" } },
+                    additionalProperties: false
+                },
+                { draft }
+            );
+            const authoredRefs = { ...node.context.refs };
+            const cases = [
+                { data: { a: {} }, valid: true },
+                { data: { b: { a: {} } }, valid: true },
+                { data: { a: { b: {} }, b: {} }, valid: true },
+                { data: { a: { unexpected: true } }, valid: false },
+                { data: { b: { a: 1 } }, valid: false }
+            ];
+
+            for (const { data, valid } of cases) {
+                assert.equal(node.validate(data).valid, valid);
+                assert.deepEqual(Object.keys(node.context.refs), Object.keys(authoredRefs));
+                for (const [ref, authoredNode] of Object.entries(authoredRefs)) {
+                    assert.equal(node.context.refs[ref], authoredNode);
+                }
+            }
+            const { node: child, error } = node.getNodeChild("a");
+            assert.equal(error, undefined);
+            assert.ok(child);
+            assert.equal(child.schemaLocation, "#");
+            assert.equal(child.properties?.b.schemaLocation, "#/properties/b");
+            assert.equal(child.validate({ b: {} }).valid, true);
+            assert.equal(child.validate({ b: 1 }).valid, false);
+            assert.deepEqual(Object.keys(node.context.refs), Object.keys(authoredRefs));
+        });
+
         it(`should navigate reduced properties through references without retaining them (${draft})`, () => {
             const node = compileSchema(
                 {

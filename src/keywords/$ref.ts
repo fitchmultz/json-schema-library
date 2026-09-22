@@ -1,4 +1,4 @@
-import { isJsonError, isSchemaNode, JsonError, SchemaNode } from "../types";
+import { isBooleanSchema, isJsonError, isJsonSchema, isSchemaNode, JsonError, SchemaNode } from "../types";
 import { Keyword, JsonSchemaValidatorParams, ValidationPath, JsonSchemaReducerParams } from "../Keyword";
 import { resolveUri } from "../utils/resolveUri";
 import splitRef from "../utils/splitRef";
@@ -22,7 +22,7 @@ export const $refKeyword: Keyword = {
 };
 
 function register(node: SchemaNode, path: string) {
-    // Data-dependent reductions share the context, but are not authored reference targets.
+    // Reductions and reference expansions are not authored reference targets.
     if (!node.dynamicId && node.context.refs[path] == null) {
         node.context.refs[path] = node;
     }
@@ -147,35 +147,23 @@ function validateRef({ node, data, pointer = "#", path }: JsonSchemaValidatorPar
     });
 }
 
-// 1. https://json-schema.org/draft/2019-09/json-schema-core#scopes
+// https://json-schema.org/draft/2020-12/json-schema-core#dynamic-ref
 function resolveRecursiveRef(node: SchemaNode, path: ValidationPath): SchemaNode | JsonError {
-    const history = path;
     const refInCurrentScope = resolveUri(node.$id, node.schema.$dynamicRef);
-
-    // A $dynamicRef with a non-matching $dynamicAnchor in the same schema resource behaves like a normal $ref to $anchor
-    const nonMatchingDynamicAnchor = node.context.dynamicAnchors[refInCurrentScope] == null;
-    if (nonMatchingDynamicAnchor) {
-        if (node.context.anchors[refInCurrentScope]) {
-            return compileNext(node.context.anchors[refInCurrentScope], node);
-        }
+    // Only an initial URI identifying a dynamic anchor enables dynamic resolution.
+    if (node.context.dynamicAnchors[refInCurrentScope] == null) {
+        return getRef(node, refInCurrentScope);
     }
 
-    for (const entry of history) {
-        // A $dynamicRef that initially resolves to a schema with a matching $dynamicAnchor resolves to the first $dynamicAnchor in the dynamic scope
-        if (entry.node.schema.$dynamicAnchor) {
-            return compileNext(entry.node, node);
-        }
-
-        // A $dynamicRef only stops at a $dynamicAnchor if it is in the same dynamic scope.
-        const refWithoutScope = node.schema.$dynamicRef.split("#").pop();
-        const ref = resolveUri(entry.node.$id, `#${refWithoutScope}`);
+    // Select the outermost resource in the current scope with an identically named anchor.
+    const fragment = node.schema.$dynamicRef.split("#").pop();
+    for (const entry of path) {
+        const ref = resolveUri(entry.node.$id, `#${fragment}`);
         const anchorNode = node.context.dynamicAnchors[ref];
         if (anchorNode) {
-            return compileNext(node.context.dynamicAnchors[ref], node);
+            return compileNext(anchorNode, node);
         }
     }
-
-    // A $dynamicRef without a matching $dynamicAnchor in the same schema resource behaves like a normal $ref to $anchor
     return getRef(node, refInCurrentScope);
 }
 
@@ -191,7 +179,7 @@ export function compileNext(referencedNode: SchemaNode, sourceNode: SchemaNode) 
         referencedSchema,
         `${sourceNode.evaluationPath}/$ref`,
         referencedNode.schemaLocation,
-        sourceNode.dynamicId
+        sourceNode.dynamicId || `${sourceNode.schemaLocation}($ref)`
     );
 }
 
@@ -237,8 +225,10 @@ export function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonEr
             // support refOfUnknownKeyword
             const rootSchema = node.context.rootNode.schema;
             const targetSchema = get(rootSchema, $ref);
-            if (targetSchema) {
-                return node.compileSchema(targetSchema, `${node.evaluationPath}/$ref`, $ref);
+            if (isJsonSchema(targetSchema) || isBooleanSchema(targetSchema)) {
+                // A newly reached document location is authored; only its reference expansion is derived.
+                const target = node.context.rootNode.compileSchema(targetSchema, $ref, $ref);
+                return compileNext(target, node);
             }
         }
         // console.error("REF: UNFOUND 1", $ref);

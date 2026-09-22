@@ -74,8 +74,8 @@ function compileNext(referencedNode: SchemaNode, sourceNode: SchemaNode) {
     return referencedNode.compileSchema(
         referencedSchema,
         `${sourceNode.evaluationPath}/$ref`,
-        referencedSchema.schemaLocation,
-        sourceNode.dynamicId
+        referencedNode.schemaLocation,
+        sourceNode.dynamicId || `${sourceNode.schemaLocation}($ref)`
     );
 }
 

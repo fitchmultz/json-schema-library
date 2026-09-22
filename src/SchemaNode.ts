@@ -339,7 +339,13 @@ export const SchemaNodeMethods = {
     compileSchema(schema: JsonSchema, evaluationPath: string, schemaLocation?: string, dynamicId?: string): SchemaNode {
         const parentNode = this as SchemaNode;
         evaluationPath = evaluationPath ?? parentNode.evaluationPath;
-        const nextFragment = evaluationPath.split("/$ref")[0];
+        // Child locations follow the authored parent, even across reference expansions.
+        const nextFragment =
+            evaluationPath === parentNode.evaluationPath
+                ? "#"
+                : evaluationPath.startsWith(`${parentNode.evaluationPath}/`)
+                  ? `#${evaluationPath.slice(parentNode.evaluationPath.length)}`
+                  : evaluationPath;
         const node: SchemaNode = {
             lastIdPointer: parentNode.lastIdPointer, // ref helper
             context: parentNode.context,

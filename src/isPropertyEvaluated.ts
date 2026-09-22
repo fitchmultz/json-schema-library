@@ -25,6 +25,8 @@ type Options = {
  * - We could introduce this method as a new keyword-layer
  */
 export function isPropertyEvaluated({ node, data, key, pointer, path }: Options) {
+    // Reference traversal belongs to this branch, not the next property or applicator.
+    path = [...path, { pointer, node }];
     if (Array.isArray(node.schema.required) && !node.schema.required.find((prop) => hasProperty(data, prop))) {
         return false;
     }

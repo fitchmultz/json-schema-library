@@ -2,7 +2,7 @@ import { Keyword, JsonSchemaValidatorParams, ValidationPath } from "../../Keywor
 import { resolveUri } from "../../utils/resolveUri";
 import splitRef from "../../utils/splitRef";
 import { validateNode } from "../../validateNode";
-import { isSchemaNode, JsonError, SchemaNode } from "../../types";
+import { isBooleanSchema, isJsonSchema, isSchemaNode, JsonError, SchemaNode } from "../../types";
 import { get, split } from "@sagold/json-pointer";
 import { reduceRef, compileNext } from "../../keywords/$ref";
 
@@ -170,8 +170,10 @@ export default function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode 
             // support refOfUnknownKeyword
             const rootSchema = node.context.rootNode.schema;
             const targetSchema = get(rootSchema, ref);
-            if (targetSchema) {
-                return node.compileSchema(targetSchema, `${node.evaluationPath}/$ref`, ref);
+            if (isJsonSchema(targetSchema) || isBooleanSchema(targetSchema)) {
+                // Register the authored location before deriving its evaluation-path expansion.
+                const target = node.context.rootNode.compileSchema(targetSchema, ref, ref);
+                return compileNext(target, node);
             }
         }
         // console.error("REF: UNFOUND 1", $ref);
