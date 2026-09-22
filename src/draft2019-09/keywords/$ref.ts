@@ -27,7 +27,7 @@ export function parseRef(node: SchemaNode) {
     node.resolveRef = node.schema.$ref != null && node.schema.$recursiveRef != null ? resolveAdjacentRefs : resolveRef;
 
     // get and store current $id of node - this may be the same as parent $id
-    const currentId = resolveUri(node.parent?.$id, node.schema?.$id);
+    const currentId = resolveUri(node.parent?.$id ?? node.$id, node.schema?.$id);
     node.$id = currentId;
     node.lastIdPointer = node.parent?.lastIdPointer ?? "#";
     if (currentId !== node.parent?.$id && node.evaluationPath !== "#") {
@@ -187,7 +187,7 @@ export default function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode 
         if (node.context.remotes[$remoteHostRef] && node !== node.context.remotes[$remoteHostRef]) {
             const referencedNode = node.context.remotes[$remoteHostRef];
             // resolve full ref on remote schema - we store currently only store ref with domain
-            let nextNode = getRef(referencedNode, $ref);
+            let nextNode = getRef(referencedNode, resolveUri(referencedNode.$id, fragments[1]));
             if (isSchemaNode(nextNode)) {
                 return nextNode;
             }

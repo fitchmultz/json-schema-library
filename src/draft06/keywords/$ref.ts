@@ -14,9 +14,9 @@ export const $refKeyword: Keyword = {
 
 function parseRef(node: SchemaNode) {
     // get and store current $id of node - this may be the same as parent $id
-    let currentId = node.parent?.$id;
+    let currentId = node.parent?.$id ?? node.$id;
     if (node.schema?.$ref == null) {
-        currentId = resolveUri(node.parent?.$id, node.schema?.$id);
+        currentId = resolveUri(currentId, node.schema?.$id);
     }
     node.$id = currentId as string;
     node.lastIdPointer = node.parent?.lastIdPointer ?? "#";

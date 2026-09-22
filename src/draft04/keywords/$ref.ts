@@ -22,9 +22,9 @@ function register(node: SchemaNode, path: string) {
 
 function parseRef(node: SchemaNode) {
     // get and store current id of node - this may be the same as parent id
-    let currentId = node.parent?.$id;
+    let currentId = node.parent?.$id ?? node.$id;
     if (node.schema?.$ref == null && node.schema?.id) {
-        currentId = resolveUri(node.parent?.$id, node.schema.id);
+        currentId = resolveUri(currentId, node.schema.id);
         // console.log("create id", node.evaluationPath, ":", node.parent?.$id, node.schema?.id, "=>", currentId);
     }
     node.$id = currentId as string;
@@ -127,7 +127,7 @@ function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonError | u
         if (node.context.remotes[$remoteHostRef] && node !== node.context.remotes[$remoteHostRef]) {
             const referencedNode = node.context.remotes[$remoteHostRef];
             // resolve full ref on remote schema - we store currently only store ref with domain
-            let nextNode = getRef(referencedNode, $ref);
+            let nextNode = getRef(referencedNode, resolveUri(referencedNode.$id, fragments[1]));
             if (isSchemaNode(nextNode)) {
                 return nextNode;
             }

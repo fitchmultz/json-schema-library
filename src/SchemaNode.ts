@@ -553,17 +553,13 @@ export const SchemaNodeMethods = {
      * @returns the current node (not the remote schema-node)
      */
     addRemoteSchema(url: string, schema: JsonSchema | BooleanSchema): SchemaNode {
-        // @draft >= 6
-        if (isJsonSchema(schema)) {
-            schema.$id = resolveUri(schema.$id || url);
-        }
-
         const node = this as SchemaNode & { schemaErrors?: JsonError[]; schemaAnnotations: JsonAnnotation[] };
         const { context } = node;
         const schemaId = isJsonSchema(schema) ? (node.context.draft ?? schema.$schema) : undefined;
         const draft = getDraft(context.drafts, schemaId ?? context.rootNode.schema?.$schema);
 
         const remoteNode: SchemaNode = {
+            $id: resolveUri(url),
             evaluationPath: "#",
             lastIdPointer: "#",
             schemaLocation: "#",
@@ -587,6 +583,9 @@ export const SchemaNodeMethods = {
         // parse and validate schema
         // @todo this is a duplicated to compileSchema
         let schemaValidation = addKeywords(remoteNode).filter((err) => err != null);
+        if (remoteNode.$id != null) {
+            remoteNode.context.remotes[remoteNode.$id] = remoteNode;
+        }
         schemaValidation = sanitizeErrors(schemaValidation);
         const schemaErrors: JsonError[] = [];
         const schemaAnnotations: JsonAnnotation[] = [];

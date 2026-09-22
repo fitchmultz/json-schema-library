@@ -33,7 +33,7 @@ export function parseRef(node: SchemaNode) {
     node.resolveRef = node.schema.$ref != null && node.schema.$dynamicRef != null ? resolveAdjacentRefs : resolveRef;
 
     // get and store current $id of node - this may be the same as parent $id
-    const currentId = resolveUri(node.parent?.$id, node.schema?.$id);
+    const currentId = resolveUri(node.parent?.$id ?? node.$id, node.schema?.$id);
     node.$id = currentId;
     node.lastIdPointer = node.parent?.lastIdPointer ?? "#";
     if (currentId !== node.parent?.$id && node.evaluationPath !== "#") {
@@ -180,7 +180,12 @@ function validateRef({ node, data, pointer = "#", path }: JsonSchemaValidatorPar
 
 // https://json-schema.org/draft/2020-12/json-schema-core#dynamic-ref
 function resolveRecursiveRef(node: SchemaNode, path: ValidationPath): SchemaNode | JsonError {
-    const refInCurrentScope = resolveUri(node.$id, node.schema.$dynamicRef);
+    let refInCurrentScope = resolveUri(node.$id, node.schema.$dynamicRef);
+    const [resource, refFragment] = splitRef(refInCurrentScope);
+    const remote = resource && node.context.remotes[resource];
+    if (remote && refFragment) {
+        refInCurrentScope = resolveUri(remote.$id, refFragment);
+    }
     // Only an initial URI identifying a dynamic anchor enables dynamic resolution.
     if (node.context.dynamicAnchors[refInCurrentScope] == null) {
         return getRef(node, refInCurrentScope);
@@ -277,7 +282,7 @@ export function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonEr
         if (node.context.remotes[$remoteHostRef] && node !== node.context.remotes[$remoteHostRef]) {
             const referencedNode = node.context.remotes[$remoteHostRef];
             // resolve full ref on remote schema - we store currently only store ref with domain
-            let nextNode = getRef(referencedNode, $ref);
+            let nextNode = getRef(referencedNode, resolveUri(referencedNode.$id, fragments[1]));
             if (isSchemaNode(nextNode)) {
                 return nextNode;
             }
