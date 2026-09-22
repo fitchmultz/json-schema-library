@@ -1,5 +1,5 @@
 import { ValidationPath } from "./Keyword";
-import { SchemaNode } from "./types";
+import { isSchemaNode, SchemaNode } from "./types";
 import { hasProperty } from "./utils/hasProperty";
 // import { getValue } from "./utils/getValue";
 import { validateNode } from "./validateNode";
@@ -85,7 +85,7 @@ export function isPropertyEvaluated({ node, data, key, pointer, path }: Options)
     }
 
     const resolved = node.resolveRef({ pointer, path });
-    if (resolved !== node) {
+    if (isSchemaNode(resolved) && resolved !== node) {
         if (isPropertyEvaluated({ node: resolved, data, key, pointer, path })) {
             return true;
         }

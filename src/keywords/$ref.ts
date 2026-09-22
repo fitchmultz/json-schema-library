@@ -30,7 +30,7 @@ function register(node: SchemaNode, path: string) {
 
 export function parseRef(node: SchemaNode) {
     // @ts-expect-error add ref resolution method to node
-    node.resolveRef = resolveRef;
+    node.resolveRef = node.schema.$ref != null && node.schema.$dynamicRef != null ? resolveAdjacentRefs : resolveRef;
 
     // get and store current $id of node - this may be the same as parent $id
     const currentId = resolveUri(node.parent?.$id, node.schema?.$id);
@@ -94,6 +94,9 @@ export function reduceRef({ node, data, key, pointer, path }: JsonSchemaReducerP
     }
 
     const resolvedNode = node.resolveRef({ pointer, path });
+    if (isJsonError(resolvedNode)) {
+        return resolvedNode;
+    }
     if (resolvedNode == null) {
         return node.createError("ref-error", {
             ref: node.schema.$ref ?? node.schema.$dynamicRef,
@@ -101,6 +104,11 @@ export function reduceRef({ node, data, key, pointer, path }: JsonSchemaReducerP
             schema: node.schema,
             value: data
         });
+    }
+
+    if (node.resolveRef === resolveAdjacentRefs) {
+        const result = resolvedNode.reduceNode(data, { key, pointer, path });
+        return result.node ?? result.error;
     }
 
     if (resolvedNode.schemaLocation === node.schemaLocation) {
@@ -131,6 +139,20 @@ export function resolveRef(this: SchemaNode, { pointer, path = [] }: { pointer?:
     }
 
     return resolvedNode;
+}
+
+export function resolveAdjacentRefs(this: SchemaNode) {
+    const keyword = this.context.version === "draft-2019-09" ? "$recursiveRef" : "$dynamicRef";
+    // A distinct derived location lets schema traversal visit both applicators without replacing authored targets.
+    return this.compileSchema(
+        {
+            ...pick(this.schema, ...settings.PROPERTIES_TO_MERGE),
+            allOf: [{ $ref: this.schema.$ref }, { [keyword]: this.schema[keyword] }]
+        },
+        `${this.evaluationPath}/$ref`,
+        `${this.schemaLocation}/$ref`,
+        `${this.schemaLocation}($ref+${keyword})`
+    );
 }
 
 function validateRef({ node, data, pointer = "#", path }: JsonSchemaValidatorParams) {

@@ -4,7 +4,7 @@ import splitRef from "../../utils/splitRef";
 import { validateNode } from "../../validateNode";
 import { isBooleanSchema, isJsonSchema, isSchemaNode, JsonError, SchemaNode } from "../../types";
 import { get, split } from "@sagold/json-pointer";
-import { reduceRef, compileNext } from "../../keywords/$ref";
+import { reduceRef, compileNext, resolveAdjacentRefs } from "../../keywords/$ref";
 
 export const $refKeyword: Keyword = {
     id: "$ref",
@@ -24,7 +24,7 @@ function register(node: SchemaNode, path: string) {
 
 export function parseRef(node: SchemaNode) {
     // @ts-expect-error add ref resolution method to node
-    node.resolveRef = resolveRef;
+    node.resolveRef = node.schema.$ref != null && node.schema.$recursiveRef != null ? resolveAdjacentRefs : resolveRef;
 
     // get and store current $id of node - this may be the same as parent $id
     const currentId = resolveUri(node.parent?.$id, node.schema?.$id);
@@ -108,29 +108,22 @@ function resolveRecursiveRef(node: SchemaNode, path: ValidationPath): SchemaNode
     if (!isSchemaNode(initialTarget) || initialTarget.schema.$recursiveAnchor !== true) {
         return initialTarget;
     }
-    const history = path;
-
-    // RESTRICT BY CHANGE IN BASE-URL
-    // go back in history until we have a domain definition and use this as start node to search for an anchor
-    let startIndex = 0;
-    for (let i = history.length - 1; i >= 0; i--) {
-        if (history[i].node.schema.$recursiveAnchor === false) {
-            // $recursiveRef with $recursiveAnchor: false works like $ref
-            return initialTarget;
+    let target = initialTarget;
+    let resourceId = node.$id;
+    for (let i = path.length - 1; i >= 0; i--) {
+        const entry = path[i].node;
+        if (entry.$id === resourceId) {
+            continue;
         }
-        if (/^https?:\/\//.test(history[i].node.schema.$id ?? "") && history[i].node.schema.$recursiveAnchor !== true) {
-            startIndex = i;
+        resourceId = entry.$id;
+        // Reference expansions omit schema.$id; the effective ID still identifies the authored resource.
+        const resource = entry.context.refs[resourceId ?? "#"];
+        if (resource?.schema.$recursiveAnchor !== true) {
             break;
         }
+        target = compileNext(resource, node);
     }
-
-    // FROM THERE FIND FIRST OCCURENCE OF AN ANCHOR
-    const firstAnchor = history.find((s, index) => index >= startIndex && s.node.schema.$recursiveAnchor === true);
-    if (firstAnchor) {
-        return firstAnchor.node;
-    }
-
-    return initialTarget;
+    return target;
 }
 
 export default function getRef(node: SchemaNode, $ref = node?.$ref): SchemaNode | JsonError {

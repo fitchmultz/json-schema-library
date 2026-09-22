@@ -154,6 +154,47 @@ describe("reference validation scope", () => {
         });
     }
 
+    for (const base of ["https://example.test/", "urn:example:"]) {
+        for (const [name, anchor, expectedKind] of [
+            ["omitted", {}, "C"],
+            ["false", { $recursiveAnchor: false }, "C"],
+            ["true", { $recursiveAnchor: true }, "A"]
+        ] as const) {
+            it(`should stop recursive scope at non-enabled intermediate resources (${base}, ${name})`, () => {
+                const $schema = "https://json-schema.org/draft/2019-09/schema";
+                const node = compileSchema({
+                    $schema,
+                    $id: `${base}a`,
+                    $recursiveAnchor: true,
+                    type: "object",
+                    required: ["kind"],
+                    properties: { kind: { const: "A" }, b: { $ref: `${base}b` } }
+                }).addRemoteSchema(`${base}b`, {
+                    $schema,
+                    $id: `${base}b`,
+                    ...anchor,
+                    properties: { c: { $ref: `${base}c` } }
+                }).addRemoteSchema(`${base}c`, {
+                    $schema,
+                    $id: `${base}c`,
+                    $recursiveAnchor: true,
+                    type: "object",
+                    required: ["kind"],
+                    properties: { kind: { const: "C" }, child: { $recursiveRef: "#" } }
+                });
+                const b = node.properties!.b.resolveRef();
+                const c = b.properties!.c.resolveRef();
+                const target = c.properties!.child.resolveRef({ path: [node, b, c].map((node) => ({ pointer: "#", node })) });
+                assert.equal(target.$id, `${base}${expectedKind.toLowerCase()}`);
+                const wrap = (kind: string) => ({ kind: "A", b: { c: { kind: "C", child: { kind } } } });
+                assert.equal(node.validate(wrap(expectedKind)).valid, true);
+                assert.equal(node.validate(wrap(expectedKind === "C" ? "A" : "C")).valid, false);
+                assert.equal(node.getNode("#/b/c/child/kind", wrap(expectedKind), { path: [{ pointer: "#", node }] }).node?.schema.const, expectedKind);
+                assert.equal(node.validate(wrap(expectedKind)).valid, true);
+            });
+        }
+    }
+
     it("should isolate referenced resources when checking unevaluated properties", () => {
         const $schema = "https://json-schema.org/draft/2020-12/schema";
         const node = compileSchema({

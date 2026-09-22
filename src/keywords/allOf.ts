@@ -1,4 +1,6 @@
 import { mergeSchema } from "../utils/mergeSchema";
+import { mergeNode } from "../mergeNode";
+import { pick } from "../utils/pick";
 import { Keyword, JsonSchemaReducerParams, JsonSchemaValidatorParams, ValidationReturnType } from "../Keyword";
 import { SchemaNode } from "../types";
 import { validateNode } from "../validateNode";
@@ -47,9 +49,10 @@ function reduceAllOf({ node, data, key, pointer, path }: JsonSchemaReducerParams
     // note: parts of schemas could be merged, e.g. if they do not include
     // dynamic schema parts
     let mergedSchema = {};
+    let mergedNode: SchemaNode | undefined;
     let dynamicId = "";
     for (let i = 0; i < node[KEYWORD].length; i += 1) {
-        const { node: schemaNode } = node[KEYWORD][i].reduceNode(data, { key, pointer, path });
+        const { node: schemaNode } = node[KEYWORD][i].reduceNode(data, { key, pointer, path: [...path] });
         if (schemaNode) {
             const nestedDynamicId = schemaNode.dynamicId?.replace(node.dynamicId, "") ?? "";
             const localDynamicId = nestedDynamicId === "" ? `${KEYWORD}/${i}` : nestedDynamicId;
@@ -57,15 +60,25 @@ function reduceAllOf({ node, data, key, pointer, path }: JsonSchemaReducerParams
 
             const schema = mergeSchema(node[KEYWORD][i].schema, schemaNode.schema);
             mergedSchema = mergeSchema(mergedSchema, schema, KEYWORD, "contains");
+            mergedNode = mergeNode(mergedNode, schemaNode, KEYWORD, "contains");
         }
     }
 
-    return node.compileSchema(
+    const result = node.compileSchema(
         mergedSchema,
         `${node.evaluationPath}/${dynamicId}`,
         node.schemaLocation,
         `${node.schemaLocation}(${dynamicId})`
     );
+    if (!mergedNode?.toSchemaNodes().some((child) => child.context !== node.context || child.$id !== node.$id)) {
+        return result;
+    }
+    // Keep foreign resource contexts instead of rebasing their child references onto this allOf.
+    return {
+        ...result,
+        ...mergeNode(result, mergedNode, KEYWORD, "contains"),
+        ...pick(result, "schema", "context", "$id", "schemaLocation", "evaluationPath", "dynamicId")
+    };
 }
 
 function validateAllOf({ node, data, pointer, path }: JsonSchemaValidatorParams) {
